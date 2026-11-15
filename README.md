@@ -1,4 +1,4 @@
-# Spam Detector — AI Phishing & Scam Protection for Webmail
+# Spam Detector: AI Phishing & Scam Protection for Webmail
 
 **Spam Detector** is an explainable machine learning Chrome extension that protects users from phishing emails, scam links, and fraudulent messages in real time. Built for Gmail and Outlook Web, it scans incoming emails automatically, flags risky messages directly in the inbox list, and explains *why* a message was flagged so users can make informed decisions.
 
