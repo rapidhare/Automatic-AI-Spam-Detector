@@ -49,7 +49,7 @@
 2. **Open Chrome Extensions**
    Open Google Chrome, type `chrome://extensions` into the address bar, and press **Enter**.
 3. **Enable Developer Mode**
-   Turn on the **Developer mode** toggle switch in the top-right corner of the page.
+   Turn on the **Developer mode** toggle switch in the top-right corner of the page. DO NOT DISABLE DEVELOPER MODE, as this will prevent the extension from working
 4. **Load the Extension**
    Click **Load unpacked** in the top-left corner and select the unzipped extension folder (the folder containing `manifest.json`).
 5. **Pin to Toolbar**
@@ -76,7 +76,7 @@
 
 ### Quick Testing Guide
 - **Test in Gmail:** Open [mail.google.com](https://mail.google.com) and click any email. A **Spam Detector** banner will appear automatically above the email body, and flagged inbox rows will display a red `!` icon. *(Note: The backend runs on a free cloud instance that sleeps after 15 minutes of inactivity; if it is asleep, the first scan takes ~20–30 seconds to wake up, after which scans complete in ~1–2 seconds.)*
-- **Test with Custom Messages:** Click the **Spam Detector** icon in your Chrome toolbar, paste any sample phishing or legitimate message into **Quick Text / SMS Scan**, and click **Analyze Text**.
+- **Test with Custom Messages:** Click the **Spam Detector** icon in your Chrome toolbar, paste any sample phishing or legitimate message into **Quick Text / SMS Scan**, and click ** Analyse Text**.
 
 ---
 
