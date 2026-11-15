@@ -44,6 +44,14 @@ TRUSTED_BRANDS = {
     "maybank": ["maybank2u.com.my", "maybank.com"],
     "cimb": ["cimbclicks.com.my", "cimb.com"],
     "netflix": ["netflix.com"],
+    "render": ["render.com"],
+    "github": ["github.com"],
+}
+
+FREE_WEBMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "hotmail.com",
+    "outlook.com", "live.com", "icloud.com", "aol.com",
+    "proton.me", "protonmail.com", "zoho.com", "mail.com",
 }
 
 SHORTENER_DOMAINS = {
@@ -137,7 +145,6 @@ def _run_google_translate(masked_text):
 
 
 def translate_preserving_urls(text):
-    # Skip external network translation completely for plain English text
     if not NON_ENGLISH_HINT.search(text):
         return text, False
 
@@ -196,7 +203,7 @@ def trace_safe_redirects(raw_url, max_hops=2):
                 current,
                 allow_redirects=False,
                 timeout=1.5,
-                headers={"User-Agent": "SpamDetector-LinkCheck/1.2"},
+                headers={"User-Agent": "SpamDetector-LinkCheck/1.3"},
             )
             if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("Location"):
                 current = urljoin(current, resp.headers["Location"])
@@ -217,7 +224,7 @@ def analyze_sender(sender_name, sender_email, is_verified):
 
     if is_verified and domain:
         findings.append(f"Verified sender badge confirmed for {domain}")
-        return -0.12, findings
+        return 0.0, findings, domain
 
     for brand, official_domains in TRUSTED_BRANDS.items():
         if brand in name_lower and domain:
@@ -235,16 +242,17 @@ def analyze_sender(sender_name, sender_email, is_verified):
         findings.append(f'Sender domain "{domain}" uses a high-risk top-level domain')
         risk_boost += 0.25
 
-    return risk_boost, findings
+    return risk_boost, findings, domain
 
 
-def analyze_links(links):
+def analyze_links(links, sender_domain=""):
     findings = []
     risk_boost = 0.0
     seen_hrefs = set()
+    link_hosts = []
     network_checks_used = 0
 
-    for item in (links or [])[:5]:
+    for item in (links or [])[:6]:
         href = (item.get("href") or "").strip()
         visible = (item.get("text") or "").strip()
         if not href or href in seen_hrefs or not href.startswith(("http://", "https://")):
@@ -255,6 +263,7 @@ def analyze_links(links):
         host = (parsed.hostname or "").lower().removeprefix("www.")
         if not host:
             continue
+        link_hosts.append(host)
 
         if parsed.username or "@" in parsed.netloc:
             findings.append(f'Deceptive "@" credential-masking URL targeting "{host}"')
@@ -283,7 +292,6 @@ def analyze_links(links):
                 )
                 risk_boost += 0.35
 
-        # Only perform 1 live redirect check for URL shorteners so scans stay under 2s
         if host in SHORTENER_DOMAINS and network_checks_used < 1:
             network_checks_used += 1
             final_url = trace_safe_redirects(href)
@@ -295,7 +303,25 @@ def analyze_links(links):
                     findings.append(f'Redirect destination "{final_host}" uses a high-risk TLD')
                     risk_boost += 0.25
 
-    return min(risk_boost, 0.55), findings[:4]
+    domain_aligned = False
+    if (
+        sender_domain
+        and sender_domain not in FREE_WEBMAIL_DOMAINS
+        and not any(sender_domain.endswith(tld) for tld in SUSPICIOUS_TLDS)
+        and len(findings) == 0
+    ):
+        if len(link_hosts) > 0 and all(
+            h == sender_domain or h.endswith("." + sender_domain) for h in link_hosts
+        ):
+            domain_aligned = True
+        elif len(link_hosts) == 0 and any(
+            sender_domain == d or sender_domain.endswith("." + d)
+            for domains in TRUSTED_BRANDS.values()
+            for d in domains
+        ):
+            domain_aligned = True
+
+    return min(risk_boost, 0.55), findings[:4], domain_aligned
 
 
 class ScanRequest(BaseModel):
@@ -343,15 +369,28 @@ def scan_email(req: ScanRequest):
     base_spam_prob = float(probs[0])
 
     if req.quick_mode:
-        sender_boost, link_boost, all_findings = 0.0, 0.0, []
+        adjusted_prob = base_spam_prob
+        all_findings = []
+        verified_flag = False
     else:
-        sender_boost, sender_findings = analyze_sender(
+        sender_boost, sender_findings, sender_domain = analyze_sender(
             req.sender_name, req.sender_email, req.is_verified
         )
-        link_boost, link_findings = analyze_links(req.links)
+        link_boost, link_findings, domain_aligned = analyze_links(req.links, sender_domain)
         all_findings = sender_findings + link_findings
+        verified_flag = bool(req.is_verified)
 
-    adjusted_prob = float(np.clip(base_spam_prob + sender_boost + link_boost, 0.001, 0.999))
+        if verified_flag and len(link_findings) == 0:
+            # Verified sender badge automatically marks email as SAFE
+            adjusted_prob = min(base_spam_prob * 0.10, 0.05)
+        elif domain_aligned and sender_boost == 0.0:
+            # All links in the email match the sender's official domain
+            adjusted_prob = base_spam_prob * 0.25
+            all_findings.append(f"All links match sender domain ({sender_domain})")
+        else:
+            adjusted_prob = base_spam_prob + sender_boost + link_boost
+
+    adjusted_prob = float(np.clip(adjusted_prob, 0.001, 0.999))
 
     suspicious_floor = max(0.30, req.threshold - 0.15)
     if adjusted_prob >= req.threshold:
@@ -362,7 +401,7 @@ def scan_email(req: ScanRequest):
         verdict = "SAFE"
 
     top_triggers = []
-    if len(eval_indices) > 1:
+    if verdict != "SAFE" and len(eval_indices) > 1:
         impacts = [
             {
                 "word": words[idx],
@@ -379,6 +418,6 @@ def scan_email(req: ScanRequest):
         "ham_probability": round(1.0 - adjusted_prob, 4),
         "top_triggers": top_triggers,
         "security_findings": all_findings,
-        "verified_sender": False if req.quick_mode else bool(req.is_verified),
+        "verified_sender": verified_flag,
         "translated_text": eval_text if was_translated else None,
     }
