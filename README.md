@@ -16,7 +16,10 @@
 3. **Automatic spam folder**
    The User can set a % certainty threshold at which the AI will automatically filter emails and put them in a spam folder
 
-4. **22 supported languages**
+4. **100% Private and secure**
+   Our AI model does not keep or store any of your emails or information. It only summarises them and detects keywords that could make it related to a scam or spam message. The evaluation is made based on previous training data. 
+
+6. **22 supported languages**
    Please expect an additional 2-5 second delay with translations, as they have to go through a Google Translation layer, which in some instances can cause delays.
    The current supported languages are:
    - English
