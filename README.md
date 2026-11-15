@@ -66,7 +66,7 @@
 The cloud AI backend is already pre-configured inside the extension—no API keys or extra setup are required.
 
 1. **Download the Extension Folder**
-   Download and unzip the extension folder (`veritas-extension`) onto your computer (e.g., on your Desktop).
+   Download and unzip the extension folder (`spam_detect_v1.0.0`) onto your computer (e.g., on your Desktop).
 2. **Open Chrome Extensions**
    Open Google Chrome, type `chrome://extensions` into the address bar, and press **Enter**.
 3. **Enable Developer Mode**
