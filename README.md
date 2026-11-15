@@ -40,6 +40,19 @@
    - Tagalog (Filipino)
    - Vietnamese (Tiếng Việt)
    - Thai (ไทย)
+  
+## Installation
+**PLEASE NOTE: This release supports only Chromium-based browsers (Chrome, Brave, Microsoft Edge, etc.). For Webmail, currently only Gmail is supported.** 
+1. **Download the Extension Folder**
+   Download and unzip the extension folder (`spam_detect_v1.0.0`) onto your computer (e.g., on your Desktop).
+2. **Open Chrome Extensions**
+   Open Google Chrome, type `chrome://extensions` into the address bar, and press **Enter**.
+3. **Enable Developer Mode**
+   Turn on the **Developer mode** toggle switch in the top-right corner of the page.
+4. **Load the Extension**
+   Click **Load unpacked** in the top-left corner and select the unzipped extension folder (the folder containing `manifest.json`).
+5. **Pin to Toolbar**
+   Click the puzzle-piece **Extensions** icon in the top-right corner of Chrome and click the **Pin** icon next to **Spam Detector**.
 
 ## How It Works
 
@@ -59,22 +72,6 @@
 4. **Explainable Results & Optional Auto-Quarantine**
    - Displays a colour-coded security banner (`SAFE`, `SUSPICIOUS`, or `SPAM`) above opened emails showing the exact risk percentage, specific trigger words, and a reminder to read carefully since no automated detector is 100% accurate.
    - Includes an optional **Auto-Move** toggle with an adjustable AI certainty slider (60%–99%) to automatically move high-confidence spam into Gmail's Spam folder or a custom label.
-  
-  
-## How to Install & Test on Google Chrome
-
-The cloud AI backend is already pre-configured inside the extension—no API keys or extra setup are required.
-
-1. **Download the Extension Folder**
-   Download and unzip the extension folder (`spam_detect_v1.0.0`) onto your computer (e.g., on your Desktop).
-2. **Open Chrome Extensions**
-   Open Google Chrome, type `chrome://extensions` into the address bar, and press **Enter**.
-3. **Enable Developer Mode**
-   Turn on the **Developer mode** toggle switch in the top-right corner of the page.
-4. **Load the Extension**
-   Click **Load unpacked** in the top-left corner and select the unzipped extension folder (the folder containing `manifest.json`).
-5. **Pin to Toolbar**
-   Click the puzzle-piece **Extensions** icon in the top-right corner of Chrome and click the **Pin** icon next to **Spam Detector**.
 
 ### Quick Testing Guide
 - **Test in Gmail:** Open [mail.google.com](https://mail.google.com) and click any email. A **Spam Detector** banner will appear automatically above the email body, and flagged inbox rows will display a red `!` icon. *(Note: The backend runs on a free cloud instance that sleeps after 15 minutes of inactivity; if it is asleep, the first scan takes ~20–30 seconds to wake up, after which scans complete in ~1–2 seconds.)*
