@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import ipaddress
 import re
 import socket
@@ -10,6 +11,8 @@ from deep_translator import GoogleTranslator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+socket.setdefaulttimeout(1.5)
 
 app = FastAPI(title="Spam Detector API")
 
@@ -25,6 +28,8 @@ custom_model = bundle["model"]
 model_acc = bundle["acc"]
 model_f1 = bundle["f1"]
 total_rows = bundle["rows"]
+
+executor = ThreadPoolExecutor(max_workers=4)
 
 TRUSTED_BRANDS = {
     "paypal": ["paypal.com"],
@@ -50,6 +55,11 @@ SUSPICIOUS_TLDS = {
     ".xyz", ".top", ".vip", ".click", ".loan", ".work",
     ".tk", ".ml", ".ga", ".cf", ".gq", ".buzz", ".rest", ".cam",
 }
+
+NON_ENGLISH_HINT = re.compile(
+    r"(?:[^\x00-\x7F]|\b(?:tahniah|akaun|digantung|sahkan|kata laluan|menang|hadiah|pautan|segera|sekatan|sila|anda|cuenta|suspendida|contraseña|urgente|premio|verifique|correo)\b)",
+    re.IGNORECASE,
+)
 
 
 def extract_features(df_input):
@@ -122,20 +132,31 @@ def predict_probs(texts):
     return custom_model.predict_proba(temp_X)[:, 1]
 
 
+def _run_google_translate(masked_text):
+    return GoogleTranslator(source="auto", target="en").translate(masked_text[:2000])
+
+
 def translate_preserving_urls(text):
+    # Skip external network translation completely for plain English text
+    if not NON_ENGLISH_HINT.search(text):
+        return text, False
+
     urls = re.findall(r"https?://\S+|www\.\S+", text)
     masked = text
     for idx, u in enumerate(urls):
         masked = masked.replace(u, f"URLTOKEN{idx}")
+
     translated_flag = False
+    future = executor.submit(_run_google_translate, masked)
     try:
-        translated = GoogleTranslator(source="auto", target="en").translate(masked[:4500])
+        translated = future.result(timeout=2.5)
         if translated and translated.strip().lower() != masked.strip().lower():
             translated_flag = True
         else:
             translated = masked
-    except Exception:
+    except (FuturesTimeoutError, Exception):
         translated = masked
+
     for idx, u in enumerate(urls):
         translated = translated.replace(f"URLTOKEN{idx}", u)
     return translated, translated_flag
@@ -147,8 +168,7 @@ def is_public_hostname(hostname):
     try:
         infos = socket.getaddrinfo(hostname, None)
         for info in infos:
-            ip_str = info[4][0]
-            ip_obj = ipaddress.ip_address(ip_str)
+            ip_obj = ipaddress.ip_address(info[4][0])
             if (
                 ip_obj.is_private
                 or ip_obj.is_loopback
@@ -162,7 +182,7 @@ def is_public_hostname(hostname):
         return False
 
 
-def trace_safe_redirects(raw_url, max_hops=3):
+def trace_safe_redirects(raw_url, max_hops=2):
     current = raw_url
     for _ in range(max_hops):
         parsed = urlparse(current)
@@ -175,8 +195,8 @@ def trace_safe_redirects(raw_url, max_hops=3):
             resp = requests.head(
                 current,
                 allow_redirects=False,
-                timeout=2.0,
-                headers={"User-Agent": "SpamDetector-LinkCheck/1.1"},
+                timeout=1.5,
+                headers={"User-Agent": "SpamDetector-LinkCheck/1.2"},
             )
             if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("Location"):
                 current = urljoin(current, resp.headers["Location"])
@@ -197,8 +217,7 @@ def analyze_sender(sender_name, sender_email, is_verified):
 
     if is_verified and domain:
         findings.append(f"Verified sender badge confirmed for {domain}")
-        risk_boost -= 0.12
-        return risk_boost, findings
+        return -0.12, findings
 
     for brand, official_domains in TRUSTED_BRANDS.items():
         if brand in name_lower and domain:
@@ -223,8 +242,9 @@ def analyze_links(links):
     findings = []
     risk_boost = 0.0
     seen_hrefs = set()
+    network_checks_used = 0
 
-    for item in (links or [])[:6]:
+    for item in (links or [])[:5]:
         href = (item.get("href") or "").strip()
         visible = (item.get("text") or "").strip()
         if not href or href in seen_hrefs or not href.startswith(("http://", "https://")):
@@ -263,13 +283,14 @@ def analyze_links(links):
                 )
                 risk_boost += 0.35
 
-        if host in SHORTENER_DOMAINS or len(seen_hrefs) <= 2:
+        # Only perform 1 live redirect check for URL shorteners so scans stay under 2s
+        if host in SHORTENER_DOMAINS and network_checks_used < 1:
+            network_checks_used += 1
             final_url = trace_safe_redirects(href)
             final_host = (urlparse(final_url).hostname or "").lower().removeprefix("www.")
             if final_host and final_host != host:
-                if host in SHORTENER_DOMAINS:
-                    findings.append(f'Shortened link ({host}) redirects to "{final_host}"')
-                    risk_boost += 0.12
+                findings.append(f'Shortened link ({host}) redirects to "{final_host}"')
+                risk_boost += 0.12
                 if any(final_host.endswith(tld) for tld in SUSPICIOUS_TLDS):
                     findings.append(f'Redirect destination "{final_host}" uses a high-risk TLD')
                     risk_boost += 0.25
@@ -280,6 +301,7 @@ def analyze_links(links):
 class ScanRequest(BaseModel):
     message: str
     threshold: float = 0.50
+    quick_mode: bool = False
     sender_name: str = ""
     sender_email: str = ""
     is_verified: bool = False
@@ -299,7 +321,7 @@ def health_check():
 
 @app.post("/scan_email")
 def scan_email(req: ScanRequest):
-    text = (req.message or "").strip()
+    text = (req.message or "").strip()[:4000]
     if not text:
         return {
             "verdict": "SAFE",
@@ -312,7 +334,7 @@ def scan_email(req: ScanRequest):
 
     eval_text, was_translated = translate_preserving_urls(text)
     words = re.findall(r"\S+", eval_text)
-    eval_indices = [i for i, w in enumerate(words[:40]) if re.search(r"\w", w)]
+    eval_indices = [i for i, w in enumerate(words[:20]) if re.search(r"\w", w)]
 
     candidates = [eval_text] + [
         " ".join(words[:idx] + words[idx + 1 :]) for idx in eval_indices
@@ -320,10 +342,43 @@ def scan_email(req: ScanRequest):
     probs = predict_probs(candidates)
     base_spam_prob = float(probs[0])
 
-    sender_boost, sender_findings = analyze_sender(
-        req.sender_name, req.sender_email, req.is_verified
-    )
-    link_boost, link_findings = analyze_links(req.links)
-    all_findings = sender_findings + link_findings
+    if req.quick_mode:
+        sender_boost, link_boost, all_findings = 0.0, 0.0, []
+    else:
+        sender_boost, sender_findings = analyze_sender(
+            req.sender_name, req.sender_email, req.is_verified
+        )
+        link_boost, link_findings = analyze_links(req.links)
+        all_findings = sender_findings + link_findings
 
     adjusted_prob = float(np.clip(base_spam_prob + sender_boost + link_boost, 0.001, 0.999))
+
+    suspicious_floor = max(0.30, req.threshold - 0.15)
+    if adjusted_prob >= req.threshold:
+        verdict = "SPAM"
+    elif adjusted_prob >= suspicious_floor:
+        verdict = "SUSPICIOUS"
+    else:
+        verdict = "SAFE"
+
+    top_triggers = []
+    if len(eval_indices) > 1:
+        impacts = [
+            {
+                "word": words[idx],
+                "impact_pct": round((base_spam_prob - float(p)) * 100, 1),
+            }
+            for idx, p in zip(eval_indices, probs[1:])
+            if (base_spam_prob - float(p)) * 100 > 0.5
+        ]
+        top_triggers = sorted(impacts, key=lambda x: x["impact_pct"], reverse=True)[:5]
+
+    return {
+        "verdict": verdict,
+        "spam_probability": round(adjusted_prob, 4),
+        "ham_probability": round(1.0 - adjusted_prob, 4),
+        "top_triggers": top_triggers,
+        "security_findings": all_findings,
+        "verified_sender": False if req.quick_mode else bool(req.is_verified),
+        "translated_text": eval_text if was_translated else None,
+    }
