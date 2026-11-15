@@ -4,6 +4,43 @@
 
 ---
 
+## Features
+
+1. **Automatic Scanning**
+   When you open your Webmail, the AI will automatically scan your emails for spam and show a red indicator on them when it detects them as spam
+
+2. **Certainty & description**
+   When the AI detects spam emails, it will tell you its % certainty reasoning
+
+3. **Automatic spam folder**
+   The User can set a % certainty threshold at which the AI will automatically filter emails and put them in a spam folder
+
+4. **22 supported languages**
+   Please expect an additional 2-5 second delay with translations, as they have to go through a Google Translation layer, which in some instances can cause delays.
+   The current supported languages are:
+   - English
+   - Chinese Simplified (中文 简体)
+   - Chinese Traditional (中文 繁體)
+   - Spanish (Español)
+   - French (Français)
+   - German (Deutsch)
+   - Portuguese (Português)
+   - Italian (Italiano)
+   - Dutch (Nederlands)
+   - Swedish (Svenska)
+   - Polish (Polski)
+   - Hindi (हिन्दी)
+   - Russian (Русский)
+   - Japanese (日本語)
+   - Korean (한국어)
+   - Arabic (العربية)
+   - Turkish (Türkçe)
+   - Bahasa Melayu (Malay)
+   - Bahasa Indonesia (Indonesian)
+   - Tagalog (Filipino)
+   - Vietnamese (Tiếng Việt)
+   - Thai (ไทย)
+
 ## How It Works
 
 1. **Lightweight Browser Extension (Manifest V3)**
@@ -20,8 +57,9 @@
    - **Impersonation & Link Checks:** Flags mismatched display names (e.g., claiming to be a major bank or service from a free webmail address), punycode lookalike domains, raw IP URLs, and shortened link redirects.
 
 4. **Explainable Results & Optional Auto-Quarantine**
-   - Displays a color-coded security banner (`SAFE`, `SUSPICIOUS`, or `SPAM`) above opened emails showing the exact risk percentage, specific trigger words, and a reminder to read carefully since no automated detector is 100% accurate.
+   - Displays a colour-coded security banner (`SAFE`, `SUSPICIOUS`, or `SPAM`) above opened emails showing the exact risk percentage, specific trigger words, and a reminder to read carefully since no automated detector is 100% accurate.
    - Includes an optional **Auto-Move** toggle with an adjustable AI certainty slider (60%–99%) to automatically move high-confidence spam into Gmail's Spam folder or a custom label.
+  
   
 ## How to Install & Test on Google Chrome
 
