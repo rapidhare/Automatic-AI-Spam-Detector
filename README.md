@@ -44,6 +44,9 @@
   
 ## Installation
 **PLEASE NOTE: This release supports only Chromium-based browsers (Chrome, Brave, Microsoft Edge, etc.). For Webmail, currently only Gmail is supported.** 
+
+You can watch the Installation Video [HERE](https://drive.google.com/file/d/17M3_lRNvHvpnIJJ6ghhxxKeXMbbmq7Ru/view?usp=sharing)
+
 1. **Download the Extension Folder from the [releases page](https://github.com/rapidhare/Automatic-AI-Spam-Detector/releases/tag/v1.0.0/)**
    Download the ZIP file from the releases page, and unzip the extension folder (`spam_detect_v1.0.0`) onto your computer (e.g., on your Desktop).
 2. **Open Chrome Extensions**
